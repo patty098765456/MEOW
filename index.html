@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FNMA Stock Tracker</title>
+  <style>
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --surface2: #22263a;
+      --border: #2e3350;
+      --accent: #4f8ef7;
+      --accent2: #7c5cbf;
+      --green: #22c55e;
+      --red: #ef4444;
+      --text: #e8eaf0;
+      --muted: #7b82a0;
+      --radius: 12px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      min-height: 100vh;
+      padding: 24px 16px;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 28px;
+      max-width: 1200px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    header .logo {
+      width: 44px;
+      height: 44px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 18px;
+      color: #fff;
+      flex-shrink: 0;
+    }
+
+    header h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.3px; }
+    header p { color: var(--muted); font-size: 13px; margin-top: 2px; }
+
+    .refresh-btn {
+      margin-left: auto;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 14px;
+      color: var(--text);
+      font-size: 13px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .refresh-btn:hover { background: var(--border); }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    @media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+    }
+
+    .card h2 {
+      font-size: 13px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--muted);
+      margin-bottom: 16px;
+    }
+
+    #price-card { grid-column: 1 / -1; }
+
+    .price-row { display: flex; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
+    .price-main { font-size: 52px; font-weight: 800; letter-spacing: -2px; line-height: 1; }
+
+    .price-change {
+      font-size: 20px; font-weight: 600;
+      padding: 4px 12px; border-radius: 8px; margin-bottom: 4px;
+    }
+    .price-change.up { background: rgba(34,197,94,0.15); color: var(--green); }
+    .price-change.down { background: rgba(239,68,68,0.15); color: var(--red); }
+
+    .price-meta { display: flex; gap: 20px; margin-top: 14px; flex-wrap: wrap; }
+    .price-meta-item { display: flex; flex-direction: column; gap: 2px; }
+    .price-meta-item .label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; }
+    .price-meta-item .value { font-size: 15px; font-weight: 600; }
+
+    .market-state {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 12px; font-weight: 600; color: var(--muted); margin-top: 10px;
+    }
+    .market-state .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+    .market-state.open .dot { background: var(--green); box-shadow: 0 0 6px var(--green); }
+
+    #chart-wrap { height: 140px; margin-top: 18px; position: relative; }
+    canvas#sparkline { width: 100%; height: 100%; }
+
+    .news-list { display: flex; flex-direction: column; gap: 14px; }
+    .news-item {
+      display: flex; gap: 12px; text-decoration: none; color: inherit;
+      padding: 12px; border-radius: 8px; border: 1px solid transparent;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .news-item:hover { background: var(--surface2); border-color: var(--border); }
+    .news-thumb { width: 72px; height: 52px; object-fit: cover; border-radius: 6px; flex-shrink: 0; background: var(--surface2); }
+    .news-thumb-placeholder {
+      width: 72px; height: 52px; border-radius: 6px; flex-shrink: 0;
+      background: var(--surface2); display: flex; align-items: center; justify-content: center; font-size: 22px;
+    }
+    .news-content { flex: 1; min-width: 0; }
+    .news-title { font-size: 14px; font-weight: 600; line-height: 1.4; margin-bottom: 4px; }
+    .news-meta { font-size: 12px; color: var(--muted); }
+
+    #notes-card { display: flex; flex-direction: column; }
+    .note-input {
+      background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
+      padding: 10px 14px; color: var(--text); font-size: 14px; font-family: inherit;
+      resize: vertical; min-height: 80px; width: 100%; transition: border-color 0.15s;
+    }
+    .note-input:focus { outline: none; border-color: var(--accent); }
+    .note-input::placeholder { color: var(--muted); }
+
+    .btn {
+      background: var(--accent); color: #fff; border: none; border-radius: 8px;
+      padding: 9px 18px; font-size: 14px; font-weight: 600; cursor: pointer; transition: opacity 0.15s;
+    }
+    .btn:hover { opacity: 0.85; }
+    .btn.secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+
+    .notes-list { margin-top: 16px; display: flex; flex-direction: column; gap: 10px; }
+    .note-entry { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 14px; }
+    .note-entry .note-text { font-size: 14px; line-height: 1.6; white-space: pre-wrap; word-break: break-word; }
+    .note-entry .note-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; }
+    .note-entry .note-date { font-size: 11px; color: var(--muted); }
+    .note-delete {
+      background: none; border: none; color: var(--muted); cursor: pointer;
+      font-size: 16px; padding: 2px 6px; border-radius: 4px; transition: color 0.15s, background 0.15s;
+    }
+    .note-delete:hover { color: var(--red); background: rgba(239,68,68,0.1); }
+    .note-price-tag {
+      display: inline-block; background: rgba(79,142,247,0.15); color: var(--accent);
+      border-radius: 4px; padding: 1px 7px; font-size: 11px; font-weight: 600; margin-left: 8px;
+    }
+    .empty-state { text-align: center; color: var(--muted); font-size: 14px; padding: 24px 0; }
+
+    .skeleton {
+      background: linear-gradient(90deg, var(--surface2) 25%, var(--border) 50%, var(--surface2) 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.4s infinite;
+      border-radius: 6px;
+    }
+    @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+    .error-msg { color: var(--red); font-size: 13px; display: flex; align-items: center; gap: 6px; }
+    .last-updated { font-size: 11px; color: var(--muted); margin-top: 6px; }
+    .notes-toolbar { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">FM</div>
+  <div>
+    <h1>FNMA Stock Tracker</h1>
+    <p>Federal National Mortgage Association &mdash; Fannie Mae</p>
+  </div>
+  <button class="refresh-btn" onclick="refreshAll()">&#8635; Refresh</button>
+</header>
+
+<div class="grid">
+
+  <div class="card" id="price-card">
+    <h2>Live Quote &bull; FNMA</h2>
+    <div id="quote-body">
+      <div class="skeleton" style="height:52px;width:180px;margin-bottom:10px;"></div>
+      <div class="skeleton" style="height:20px;width:260px;"></div>
+    </div>
+    <div id="chart-wrap"><canvas id="sparkline"></canvas></div>
+  </div>
+
+  <div class="card" id="news-card">
+    <h2>Recent News</h2>
+    <div id="news-body">
+      <div class="skeleton" style="height:56px;margin-bottom:10px;"></div>
+      <div class="skeleton" style="height:56px;margin-bottom:10px;"></div>
+      <div class="skeleton" style="height:56px;"></div>
+    </div>
+  </div>
+
+  <div class="card" id="notes-card">
+    <h2>Investment Thesis Notes</h2>
+    <textarea class="note-input" id="note-text" placeholder="Add a note about your investment thesis, price targets, catalysts, risks..."></textarea>
+    <div class="notes-toolbar">
+      <button class="btn" onclick="saveNote()">Save Note</button>
+      <button class="btn secondary" onclick="clearInput()">Clear</button>
+    </div>
+    <div id="notes-list" class="notes-list"></div>
+  </div>
+
+</div>
+
+<script>
+// ── Config ────────────────────────────────────────────────────────────────
+// Uses corsproxy.io to bypass CORS when opening as a local file.
+// When served from a web server the proxy is often not needed, but it
+// works either way.
+const PROXY = 'https://corsproxy.io/?';
+const YF_BASE = 'https://query1.finance.yahoo.com';
+
+function yf(path) {
+  return PROXY + encodeURIComponent(YF_BASE + path);
+}
+
+let currentPrice = null;
+let chartPoints = [];
+
+async function fetchJSON(url) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  return res.json();
+}
+
+// ── Quote ─────────────────────────────────────────────────────────────────
+async function loadQuote() {
+  const body = document.getElementById('quote-body');
+  try {
+    const data = await fetchJSON(yf('/v8/finance/chart/FNMA?interval=1d&range=1d'));
+    const meta = data.chart.result[0].meta;
+    const price = meta.regularMarketPrice;
+    const prev  = meta.previousClose || meta.chartPreviousClose;
+    currentPrice = price;
+    const change    = +(price - prev).toFixed(4);
+    const changePct = +(((price - prev) / prev) * 100).toFixed(2);
+    const up = change >= 0;
+    const sign = up ? '+' : '';
+    const stateClass = meta.marketState === 'REGULAR' ? 'open' : '';
+    const stateLabel = meta.marketState === 'REGULAR' ? 'Market Open'
+                     : meta.marketState === 'PRE'     ? 'Pre-Market'
+                     : meta.marketState === 'POST'    ? 'After Hours'
+                     : 'Market Closed';
+
+    body.innerHTML = `
+      <div class="price-row">
+        <span class="price-main">$${price.toFixed(4)}</span>
+        <span class="price-change ${up ? 'up' : 'down'}">
+          ${sign}${change.toFixed(4)} (${sign}${changePct}%)
+        </span>
+      </div>
+      <div class="price-meta">
+        <div class="price-meta-item">
+          <span class="label">Prev Close</span>
+          <span class="value">$${prev.toFixed(4)}</span>
+        </div>
+        <div class="price-meta-item">
+          <span class="label">Day High</span>
+          <span class="value">$${(meta.regularMarketDayHigh || 0).toFixed(4)}</span>
+        </div>
+        <div class="price-meta-item">
+          <span class="label">Day Low</span>
+          <span class="value">$${(meta.regularMarketDayLow || 0).toFixed(4)}</span>
+        </div>
+        <div class="price-meta-item">
+          <span class="label">Volume</span>
+          <span class="value">${Number(meta.regularMarketVolume || 0).toLocaleString()}</span>
+        </div>
+        <div class="price-meta-item">
+          <span class="label">Currency</span>
+          <span class="value">${meta.currency}</span>
+        </div>
+      </div>
+      <div class="market-state ${stateClass}">
+        <span class="dot"></span>${stateLabel}
+      </div>
+      <div class="last-updated">Updated ${new Date(meta.regularMarketTime * 1000).toLocaleTimeString()}</div>
+    `;
+  } catch (err) {
+    body.innerHTML = `<div class="error-msg">&#9888; Failed to load quote: ${escHtml(err.message)}</div>`;
+  }
+}
+
+// ── Chart ─────────────────────────────────────────────────────────────────
+async function loadChart() {
+  try {
+    const data = await fetchJSON(yf('/v8/finance/chart/FNMA?interval=1h&range=5d'));
+    const result = data.chart.result[0];
+    const timestamps = result.timestamp || [];
+    const closes = result.indicators.quote[0].close || [];
+    chartPoints = timestamps
+      .map((t, i) => ({ t: new Date(t * 1000).toISOString(), v: closes[i] }))
+      .filter(p => p.v != null);
+    drawChart(chartPoints);
+  } catch (err) {
+    console.warn('Chart failed:', err.message);
+  }
+}
+
+function drawChart(points) {
+  const canvas = document.getElementById('sparkline');
+  const wrap   = document.getElementById('chart-wrap');
+  if (!points.length || !wrap.clientWidth) return;
+
+  const dpr = window.devicePixelRatio || 1;
+  const W = wrap.clientWidth, H = wrap.clientHeight;
+  canvas.width  = W * dpr; canvas.height = H * dpr;
+  canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+
+  const vals = points.map(p => p.v);
+  const min = Math.min(...vals), max = Math.max(...vals), range = max - min || 1;
+  const pad = { top: 10, right: 10, bottom: 20, left: 52 };
+  const w = W - pad.left - pad.right, h = H - pad.top - pad.bottom;
+  const x = i => pad.left + (i / (points.length - 1)) * w;
+  const y = v => pad.top + (1 - (v - min) / range) * h;
+
+  ctx.strokeStyle = 'rgba(46,51,80,0.8)'; ctx.lineWidth = 1;
+  [0, 0.5, 1].forEach(frac => {
+    const yy = pad.top + frac * h;
+    ctx.beginPath(); ctx.moveTo(pad.left, yy); ctx.lineTo(pad.left + w, yy); ctx.stroke();
+    ctx.fillStyle = '#7b82a0'; ctx.font = '10px system-ui'; ctx.textAlign = 'right';
+    ctx.fillText('$' + (max - frac * range).toFixed(2), pad.left - 4, yy + 3.5);
+  });
+
+  const up = vals[vals.length - 1] >= vals[0];
+  const grad = ctx.createLinearGradient(0, pad.top, 0, pad.top + h);
+  grad.addColorStop(0, up ? 'rgba(34,197,94,0.28)' : 'rgba(239,68,68,0.28)');
+  grad.addColorStop(1, 'rgba(0,0,0,0)');
+
+  ctx.beginPath();
+  ctx.moveTo(x(0), y(vals[0]));
+  for (let i = 1; i < points.length; i++) ctx.lineTo(x(i), y(vals[i]));
+  ctx.lineTo(x(points.length - 1), pad.top + h); ctx.lineTo(x(0), pad.top + h);
+  ctx.closePath(); ctx.fillStyle = grad; ctx.fill();
+
+  ctx.beginPath(); ctx.moveTo(x(0), y(vals[0]));
+  for (let i = 1; i < points.length; i++) ctx.lineTo(x(i), y(vals[i]));
+  ctx.strokeStyle = up ? '#22c55e' : '#ef4444'; ctx.lineWidth = 2; ctx.lineJoin = 'round'; ctx.stroke();
+
+  const li = points.length - 1;
+  ctx.beginPath(); ctx.arc(x(li), y(vals[li]), 4, 0, Math.PI * 2);
+  ctx.fillStyle = up ? '#22c55e' : '#ef4444'; ctx.fill();
+
+  ctx.fillStyle = '#7b82a0'; ctx.font = '10px system-ui'; ctx.textAlign = 'center';
+  const labelCount = Math.min(5, points.length);
+  for (let i = 0; i < labelCount; i++) {
+    const idx = Math.round((i / (labelCount - 1)) * (points.length - 1));
+    const d = new Date(points[idx].t);
+    ctx.fillText(d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }), x(idx), H - 2);
+  }
+}
+
+// ── News ──────────────────────────────────────────────────────────────────
+async function loadNews() {
+  const body = document.getElementById('news-body');
+  try {
+    const data = await fetchJSON(yf('/v1/finance/search?q=FNMA+Fannie+Mae&newsCount=10&quotesCount=0'));
+    const articles = (data.news || []).slice(0, 10);
+    if (!articles.length) { body.innerHTML = '<div class="empty-state">No recent news found.</div>'; return; }
+    body.innerHTML = '<div class="news-list">' + articles.map(a => {
+      const ago   = timeAgo(new Date(a.providerPublishTime * 1000));
+      const thumb = a.thumbnail?.resolutions?.[0]?.url
+        ? `<img class="news-thumb" src="${escHtml(a.thumbnail.resolutions[0].url)}" alt="" loading="lazy" onerror="this.style.display='none'">`
+        : `<div class="news-thumb-placeholder">&#128240;</div>`;
+      return `<a class="news-item" href="${escHtml(a.link)}" target="_blank" rel="noopener noreferrer">
+        ${thumb}
+        <div class="news-content">
+          <div class="news-title">${escHtml(a.title)}</div>
+          <div class="news-meta">${escHtml(a.publisher)} &bull; ${ago}</div>
+        </div>
+      </a>`;
+    }).join('') + '</div>';
+  } catch (err) {
+    body.innerHTML = `<div class="error-msg">&#9888; Failed to load news: ${escHtml(err.message)}</div>`;
+  }
+}
+
+// ── Notes ─────────────────────────────────────────────────────────────────
+function getNotes() { try { return JSON.parse(localStorage.getItem('fnma_notes') || '[]'); } catch { return []; } }
+
+function loadNotes() {
+  const list = getNotes();
+  const el = document.getElementById('notes-list');
+  if (!list.length) { el.innerHTML = '<div class="empty-state">No notes yet. Add your first investment thesis note above.</div>'; return; }
+  el.innerHTML = list.slice().reverse().map((n, i) => {
+    const realIdx = list.length - 1 - i;
+    return `<div class="note-entry">
+      <div class="note-text">${escHtml(n.text)}</div>
+      <div class="note-footer">
+        <span class="note-date">
+          ${new Date(n.date).toLocaleString()}
+          ${n.price ? `<span class="note-price-tag">FNMA $${n.price}</span>` : ''}
+        </span>
+        <button class="note-delete" onclick="deleteNote(${realIdx})" title="Delete note">&#128465;</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function saveNote() {
+  const text = document.getElementById('note-text').value.trim();
+  if (!text) return;
+  const notes = getNotes();
+  notes.push({ text, date: new Date().toISOString(), price: currentPrice });
+  localStorage.setItem('fnma_notes', JSON.stringify(notes));
+  document.getElementById('note-text').value = '';
+  loadNotes();
+}
+
+function deleteNote(idx) {
+  if (!confirm('Delete this note?')) return;
+  const notes = getNotes(); notes.splice(idx, 1);
+  localStorage.setItem('fnma_notes', JSON.stringify(notes)); loadNotes();
+}
+
+function clearInput() { document.getElementById('note-text').value = ''; }
+
+document.getElementById('note-text').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) saveNote();
+});
+
+// ── Helpers ───────────────────────────────────────────────────────────────
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function timeAgo(date) {
+  const s = Math.floor((Date.now() - date) / 1000);
+  if (s < 60) return 'just now';
+  if (s < 3600) return Math.floor(s/60) + 'm ago';
+  if (s < 86400) return Math.floor(s/3600) + 'h ago';
+  return Math.floor(s/86400) + 'd ago';
+}
+
+function refreshAll() { loadQuote(); loadChart(); loadNews(); }
+setInterval(() => { loadQuote(); loadChart(); }, 30000);
+
+loadQuote();
+loadChart();
+loadNews();
+loadNotes();
+window.addEventListener('resize', () => { if (chartPoints.length) drawChart(chartPoints); });
+</script>
+</body>
+</html>
